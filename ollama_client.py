@@ -1,9 +1,11 @@
-from ollama import chat
+import os
+from ollama import Client
 from pydantic import BaseModel
 import subprocess
 import json
 import os
 
+client = Client(host=os.getenv("OLLAMA_HOST", "http://localhost:11434"))
 
 class VlogDecisions(BaseModel):
     trim_each_clip: bool
@@ -51,7 +53,7 @@ Rules:
 - speed: 1.0 for normal. Only change if total duration is over 3 minutes.
 """
 
-    response = chat(
+    response = client.chat(
         model="phi3:mini",
         messages=[{"role": "user", "content": prompt}],
         format=VlogDecisions.model_json_schema(),
