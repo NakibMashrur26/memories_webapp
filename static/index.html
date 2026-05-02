@@ -1,0 +1,702 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Memories</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        --cream: #f7f3ed;
+        --warm-white: #fdfaf6;
+        --tan: #e8dfd0;
+        --brown: #8b6f47;
+        --dark-brown: #3d2b1a;
+        --gold: #c4973a;
+        --text: #2c1f0e;
+        --muted: #8b7355;
+        --border: rgba(139, 111, 71, 0.2);
+        --shadow: rgba(61, 43, 26, 0.08);
+      }
+
+      body {
+        font-family: "DM Sans", sans-serif;
+        background: var(--cream);
+        color: var(--text);
+        min-height: 100vh;
+      }
+
+      /* grain overlay */
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+        pointer-events: none;
+        z-index: 0;
+        opacity: 0.5;
+      }
+
+      .page {
+        position: relative;
+        z-index: 1;
+        max-width: 780px;
+        margin: 0 auto;
+        padding: 60px 24px 100px;
+      }
+
+      /* Header */
+      header {
+        margin-bottom: 64px;
+        text-align: center;
+      }
+
+      .eyebrow {
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--gold);
+        margin-bottom: 12px;
+      }
+
+      h1 {
+        font-family: "Playfair Display", serif;
+        font-size: clamp(42px, 8vw, 64px);
+        font-weight: 400;
+        color: var(--dark-brown);
+        line-height: 1.05;
+        margin-bottom: 16px;
+      }
+
+      h1 em {
+        font-style: italic;
+        color: var(--brown);
+      }
+
+      .subtitle {
+        font-size: 15px;
+        font-weight: 300;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      /* Divider */
+      .divider {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin: 48px 0;
+      }
+      .divider::before,
+      .divider::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: var(--border);
+      }
+      .divider span {
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--muted);
+        opacity: 0.7;
+      }
+
+      /* Upload zone */
+      .upload-zone {
+        border: 1.5px dashed var(--brown);
+        border-radius: 16px;
+        padding: 48px 32px;
+        text-align: center;
+        background: var(--warm-white);
+        cursor: pointer;
+        transition: all 0.2s ease;
+        position: relative;
+      }
+
+      .upload-zone:hover,
+      .upload-zone.dragging {
+        border-color: var(--gold);
+        background: #fdf8f2;
+      }
+
+      .upload-zone input[type="file"] {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        cursor: pointer;
+        width: 100%;
+        height: 100%;
+      }
+
+      .upload-icon {
+        width: 48px;
+        height: 48px;
+        margin: 0 auto 16px;
+        background: var(--tan);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .upload-icon svg {
+        width: 22px;
+        height: 22px;
+        stroke: var(--brown);
+        fill: none;
+        stroke-width: 1.5;
+      }
+
+      .upload-label {
+        font-family: "Playfair Display", serif;
+        font-size: 20px;
+        color: var(--dark-brown);
+        margin-bottom: 8px;
+      }
+
+      .upload-hint {
+        font-size: 13px;
+        color: var(--muted);
+        font-weight: 300;
+      }
+
+      /* Clip grid */
+      #clip-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 12px;
+        margin-top: 28px;
+      }
+
+      .clip-card {
+        background: var(--warm-white);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        overflow: hidden;
+        animation: fadeUp 0.3s ease forwards;
+      }
+
+      @keyframes fadeUp {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .clip-thumb {
+        width: 100%;
+        aspect-ratio: 16/9;
+        background: var(--tan);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .clip-thumb video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .clip-thumb .duration {
+        position: absolute;
+        bottom: 6px;
+        right: 6px;
+        background: rgba(61, 43, 26, 0.75);
+        color: #fff;
+        font-size: 10px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-weight: 500;
+      }
+
+      .clip-info {
+        padding: 8px 10px;
+      }
+
+      .clip-name {
+        font-size: 11px;
+        color: var(--muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .clip-size {
+        font-size: 10px;
+        color: var(--brown);
+        opacity: 0.7;
+        margin-top: 2px;
+      }
+
+      /* Actions */
+      .actions {
+        margin-top: 36px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+
+      .btn-primary {
+        font-family: "DM Sans", sans-serif;
+        font-size: 14px;
+        font-weight: 500;
+        letter-spacing: 0.04em;
+        background: var(--dark-brown);
+        color: var(--cream);
+        border: none;
+        border-radius: 8px;
+        padding: 13px 28px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .btn-primary:hover {
+        background: #2a1a0a;
+        transform: translateY(-1px);
+      }
+      .btn-primary:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .btn-secondary {
+        font-family: "DM Sans", sans-serif;
+        font-size: 14px;
+        font-weight: 400;
+        color: var(--brown);
+        background: none;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 13px 24px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+      .btn-secondary:hover {
+        border-color: var(--brown);
+        background: var(--warm-white);
+      }
+      .btn-secondary:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+
+      .clip-count {
+        font-size: 13px;
+        color: var(--muted);
+        margin-left: auto;
+      }
+
+      /* Status */
+      #status-bar {
+        margin-top: 24px;
+        padding: 14px 18px;
+        border-radius: 10px;
+        font-size: 13px;
+        display: none;
+      }
+
+      #status-bar.info {
+        background: #fdf3e3;
+        color: #8b5e1a;
+        border: 1px solid #f0d49a;
+        display: block;
+      }
+      #status-bar.success {
+        background: #edf5ec;
+        color: #2e6b2a;
+        border: 1px solid #a8d4a5;
+        display: block;
+      }
+      #status-bar.error {
+        background: #fdf0ee;
+        color: #8b2a1a;
+        border: 1px solid #f0b4a5;
+        display: block;
+      }
+
+      /* Loading spinner */
+      .spinner {
+        width: 14px;
+        height: 14px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: spin 0.7s linear infinite;
+        display: none;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* Output section */
+      #output-section {
+        display: none;
+        margin-top: 48px;
+      }
+
+      #output-section.visible {
+        display: block;
+      }
+
+      .output-label {
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+        color: var(--gold);
+        margin-bottom: 16px;
+      }
+
+      .video-player {
+        width: 100%;
+        border-radius: 12px;
+        overflow: hidden;
+        background: var(--dark-brown);
+        box-shadow: 0 8px 32px var(--shadow);
+      }
+
+      .video-player video {
+        width: 100%;
+        display: block;
+      }
+
+      .output-actions {
+        margin-top: 16px;
+        display: flex;
+        gap: 12px;
+      }
+
+      .btn-download {
+        font-family: "DM Sans", sans-serif;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--dark-brown);
+        background: var(--tan);
+        border: none;
+        border-radius: 8px;
+        padding: 11px 22px;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .btn-download:hover {
+        background: #ddd0be;
+      }
+
+      /* Footer */
+      footer {
+        margin-top: 80px;
+        text-align: center;
+        font-size: 12px;
+        color: var(--muted);
+        opacity: 0.5;
+        font-weight: 300;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header>
+        <p class="eyebrow">Your personal vlog maker</p>
+        <h1>Turn moments into <em>memories</em></h1>
+        <p class="subtitle">
+          Upload your clips and we'll stitch them into a vlog — all running
+          locally on your machine.
+        </p>
+      </header>
+
+      <div class="divider"><span>Upload your clips</span></div>
+
+      <div class="upload-zone" id="drop-zone">
+        <input type="file" id="file-input" accept="video/*" multiple />
+        <div class="upload-icon">
+          <svg viewBox="0 0 24 24">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="17 8 12 3 7 8" />
+            <line x1="12" y1="3" x2="12" y2="15" />
+          </svg>
+        </div>
+        <p class="upload-label">Drop your videos here</p>
+        <p class="upload-hint">or click to browse — MP4, MOV, M4V supported</p>
+      </div>
+
+      <div style="margin-top: 24px">
+        <label
+          style="
+            display: block;
+            font-size: 11px;
+            font-weight: 500;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 8px;
+          "
+          >Vlog name</label
+        >
+        <input
+          type="text"
+          id="vlog-name"
+          placeholder="Summer in Barcelona"
+          style="
+            width: 100%;
+            padding: 12px 16px;
+            border: 1.5px solid var(--border);
+            border-radius: 8px;
+            background: var(--warm-white);
+            font-family: &quot;DM Sans&quot;, sans-serif;
+            font-size: 15px;
+            color: var(--text);
+            outline: none;
+            transition: border-color 0.2s;
+          "
+          onfocus="this.style.borderColor = 'var(--gold)'"
+          onblur="this.style.borderColor = 'var(--border)'"
+        />
+      </div>
+
+      <div id="clip-grid"></div>
+
+      <div class="actions">
+        <button class="btn-primary" id="stitch-btn" disabled>
+          <div class="spinner" id="spinner"></div>
+          <span id="stitch-label">Create vlog</span>
+        </button>
+        <button class="btn-secondary" id="clear-btn" disabled>Clear all</button>
+        <span class="clip-count" id="clip-count"></span>
+      </div>
+
+      <div id="status-bar"></div>
+
+      <div id="output-section">
+        <div class="divider"><span>Your vlog</span></div>
+        <p class="output-label">Ready to watch</p>
+        <div class="video-player">
+          <video id="output-video" controls></video>
+        </div>
+        <div class="output-actions">
+          <a
+            class="btn-download"
+            id="download-btn"
+            href="/download"
+            download="vlog.mp4"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            Download vlog
+          </a>
+        </div>
+      </div>
+
+      <footer>
+        Memories · running locally · all files stay on your machine
+      </footer>
+    </div>
+
+    <script>
+      console.log('>>> script loaded');
+      const fileInput = document.getElementById("file-input");
+      const dropZone = document.getElementById("drop-zone");
+      const clipGrid = document.getElementById("clip-grid");
+      const stitchBtn = document.getElementById("stitch-btn");
+      const clearBtn = document.getElementById("clear-btn");
+      const stitchLabel = document.getElementById("stitch-label");
+      const spinner = document.getElementById("spinner");
+      const statusBar = document.getElementById("status-bar");
+      const clipCount = document.getElementById("clip-count");
+      const outputSection = document.getElementById("output-section");
+      const outputVideo = document.getElementById("output-video");
+
+      let uploadedFiles = [];
+
+      // Drag and drop
+      dropZone.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        dropZone.classList.add("dragging");
+      });
+      dropZone.addEventListener("dragleave", () =>
+        dropZone.classList.remove("dragging"),
+      );
+      dropZone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        dropZone.classList.remove("dragging");
+        handleFiles(
+          Array.from(e.dataTransfer.files).filter((f) =>
+            f.type.startsWith("video/"),
+          ),
+        );
+      });
+
+      fileInput.addEventListener("change", () => {
+        handleFiles(Array.from(fileInput.files));
+        fileInput.value = "";
+      });
+
+      clearBtn.addEventListener("click", async () => {
+        await fetch("/clear", { method: "POST" });
+        uploadedFiles = [];
+        clipGrid.innerHTML = "";
+        updateUI();
+        setStatus("", "");
+        outputSection.classList.remove("visible");
+      });
+
+      async function handleFiles(files) {
+        if (!files.length) return;
+        setStatus("Uploading clips...", "info");
+
+        for (const file of files) {
+          const formData = new FormData();
+          formData.append("file", file);
+
+          try {
+            const res = await fetch("/upload", {
+              method: "POST",
+              body: formData,
+            });
+            const data = await res.json();
+            if (data.filename) {
+              uploadedFiles.push(file);
+              addClipCard(file);
+            }
+          } catch (err) {
+            setStatus(`Failed to upload ${file.name}`, "error");
+          }
+        }
+
+        setStatus(
+          `${uploadedFiles.length} clip${uploadedFiles.length !== 1 ? "s" : ""} ready to stitch`,
+          "info",
+        );
+        updateUI();
+      }
+
+      function addClipCard(file) {
+        const card = document.createElement("div");
+        card.className = "clip-card";
+
+        const thumb = document.createElement("div");
+        thumb.className = "clip-thumb";
+
+        const vid = document.createElement("video");
+        vid.src = URL.createObjectURL(file);
+        vid.muted = true;
+        vid.preload = "metadata";
+
+        const dur = document.createElement("span");
+        dur.className = "duration";
+        dur.textContent = "...";
+        vid.addEventListener("loadedmetadata", () => {
+          const s = Math.round(vid.duration);
+          dur.textContent =
+            s < 60 ? `${s}s` : `${Math.floor(s / 60)}m${s % 60}s`;
+          vid.currentTime = 1;
+        });
+        vid.addEventListener("seeked", () => {
+          vid.pause();
+        });
+
+        thumb.appendChild(vid);
+        thumb.appendChild(dur);
+
+        const info = document.createElement("div");
+        info.className = "clip-info";
+        info.innerHTML = `
+        <div class="clip-name">${file.name}</div>
+        <div class="clip-size">${(file.size / 1024 / 1024).toFixed(1)} MB</div>
+      `;
+
+        card.appendChild(thumb);
+        card.appendChild(info);
+        clipGrid.appendChild(card);
+      }
+
+      function updateUI() {
+        const count = uploadedFiles.length;
+        stitchBtn.disabled = count === 0;
+        clearBtn.disabled = count === 0;
+        clipCount.textContent =
+          count > 0 ? `${count} clip${count !== 1 ? "s" : ""} selected` : "";
+      }
+
+      stitchBtn.addEventListener("click", async () => {
+        stitchBtn.disabled = true;
+        spinner.style.display = "block";
+        stitchLabel.textContent = "Stitching...";
+        setStatus("Generating your vlog — this may take a moment...", "info");
+        outputSection.classList.remove("visible");
+
+        try {
+          const vlogName = document.getElementById('vlog-name').value.trim() || 'vlog';
+          const safeName = vlogName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+          console.log('>>> sending name:', safeName);
+          const res = await fetch(`/stitch?name=${encodeURIComponent(safeName)}`, { method: 'POST' });
+          const data = await res.json();
+          console.log('>>> response from server:', JSON.stringify(data)); 
+
+          if (data.status === "success") {
+            setStatus("Your vlog is ready!", "success");
+            outputSection.classList.add("visible");
+            outputVideo.src = `/download?t=${Date.now()}`;
+            outputVideo.load();
+            document.getElementById('download-btn').setAttribute('download', data.output_filename); 
+          } else {
+            setStatus(
+              `Something went wrong: ${data.message || data.error}`,
+              "error",
+            );
+          }
+        } catch (err) {
+          setStatus("Failed to reach the server. Is it running?", "error");
+        } finally {
+          stitchBtn.disabled = false;
+          spinner.style.display = "none";
+          stitchLabel.textContent = "Create vlog";
+          updateUI();
+        }
+      });
+
+      function setStatus(msg, type) {
+        statusBar.textContent = msg;
+        statusBar.className = type ? type : "";
+        if (!type) statusBar.style.display = "none";
+      }
+    </script>
+  </body>
+</html>
