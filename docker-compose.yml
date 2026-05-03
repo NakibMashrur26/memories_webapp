@@ -1,8 +1,17 @@
 services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - app
+
   app:
     build: .
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     volumes:
       - ./uploads:/app/uploads
       - ./outputs:/app/outputs
@@ -13,8 +22,8 @@ services:
 
   ollama:
     image: ollama/ollama
-    ports:
-      - "11434:11434"
+    expose:
+      - "11434"
     volumes:
       - ollama_data:/root/.ollama
 
