@@ -72,3 +72,27 @@ pip install -r requirements.txt
 - Consider rate limiting uploads
 - Consider auto-cleanup of old files on a schedule
 - Consider a max file size limit on uploads
+
+## MCP Server for Ollama Tool Calling
+
+### Concept
+Instead of stuffing all metadata into a prompt, give Ollama tools it can call
+to gather information itself — moving toward a true agentic architecture.
+
+### Potential tools
+- `get_clip_duration` — exact duration of a specific clip
+- `get_clip_metadata` — full ffprobe data for a clip
+- `get_total_duration` — sum of all clip durations
+- `get_clip_thumbnail` — extract a frame for visual analysis
+- `preview_edit` — run a quick ffmpeg test and return result
+
+### Plan
+1. Build MCP server with basic clip metadata tools
+2. Test with phi3:mini first
+3. If tool calling is unreliable, swap to qwen2.5:7b or llama3.1:8b
+4. Evaluate quality improvement over current prompt approach
+
+### Notes
+- Small models like phi3:mini may struggle with tool calling
+- Larger models handle tool use significantly better
+- This moves Memories toward a true agentic architecture
