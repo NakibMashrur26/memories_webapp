@@ -10,7 +10,6 @@ def build_ffmpeg_command(
 ) -> str:
     trim = decisions.trim_each_clip
     trim_secs = decisions.trim_seconds
-    speed = decisions.speed
     fade_in = decisions.add_fade_in
     fade_out = decisions.add_fade_out
 
@@ -35,21 +34,9 @@ def build_ffmpeg_command(
             if trim and trim_secs > 0 and clip_duration > trim_secs:
                 f.write(f"duration {trim_secs}\n")
 
-    # Snap speed to 1.0 if close enough
-    if 0.9 < speed < 1.1:
-        speed = 1.0
-
-    # Adjust fade_out_start for speed
-    if speed != 1.0 and fade_out_start > 0:
-        fade_out_start = round(fade_out_start / speed, 1)
-
     # Build filters
     filters = []
     audio_filters = []
-
-    if speed != 1.0:
-        filters.append(f"setpts={1 / speed}*PTS")
-        audio_filters.append(f"atempo={speed}")
 
     if fade_in:
         filters.append("fade=t=in:st=0:d=1")

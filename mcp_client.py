@@ -10,7 +10,6 @@ class VlogDecisions(BaseModel):
     trim_seconds: float
     add_fade_in: bool
     add_fade_out: bool
-    speed: float
 
 
 async def run_vlog_decisions(filenames: list[str]) -> VlogDecisions:
@@ -44,7 +43,11 @@ async def run_vlog_decisions(filenames: list[str]) -> VlogDecisions:
                     "no explanation, no markdown, no backticks, nothing else. "
                     "The JSON must have exactly these fields: "
                     "trim_each_clip (bool), trim_seconds (float), "
-                    "add_fade_in (bool), add_fade_out (bool), speed (float)."
+                    "add_fade_in (bool), add_fade_out (bool). "
+                    "trim_seconds means the maximum number of seconds to KEEP from each clip. "
+                    "For example, trim_seconds=5 means keep only the first 5 seconds of each clip. "
+                    "trim_seconds must always be greater than the shortest clip duration or set to 0 to keep full clips. "
+                    "Never set trim_seconds below 3.0."
                 ),
             },
             {
