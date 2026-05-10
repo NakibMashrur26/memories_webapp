@@ -63,7 +63,7 @@ async def run_vlog_decisions(filenames: list[str]) -> VlogDecisions:
             print(f">>> iteration {iteration}")
 
             response = ollama.chat(
-                model="phi3:mini",
+                model="qwen2.5:7b",
                 messages=history,
                 tools=ollama_tools,
             )
