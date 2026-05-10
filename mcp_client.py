@@ -40,7 +40,9 @@ async def run_vlog_decisions(filenames: list[str]) -> VlogDecisions:
                     "You are a professional video editor. "
                     "Use the available tools to gather information about the clips, "
                     "then make editing decisions. "
-                    "When you have enough information, return your final decisions as JSON with these fields: "
+                    "When you have enough information, respond with ONLY a raw JSON object, "
+                    "no explanation, no markdown, no backticks, nothing else. "
+                    "The JSON must have exactly these fields: "
                     "trim_each_clip (bool), trim_seconds (float), "
                     "add_fade_in (bool), add_fade_out (bool), speed (float)."
                 ),
@@ -55,7 +57,7 @@ async def run_vlog_decisions(filenames: list[str]) -> VlogDecisions:
         ]
 
         # Tool calling loop
-        max_iterations = 10
+        max_iterations = 20
         iteration = 0
 
         while iteration < max_iterations:
@@ -93,24 +95,27 @@ async def run_vlog_decisions(filenames: list[str]) -> VlogDecisions:
                         "name": tool_call.function.name,
                     })
 
-            # If Ollama returns a final answer
+            # No tool calls — try to parse final answer
             else:
-                print(f">>> final response: {response.message.content}")
-                try:
-                    raw = response.message.content.strip()
-                    raw = raw.replace("```json", "").replace("```", "").strip()
-                    decisions = VlogDecisions.model_validate_json(raw)
-                    return decisions
-                except Exception as e:
-                    print(f">>> failed to parse decisions: {e}")
-                    # Return safe defaults
-                    return VlogDecisions(
-                        trim_each_clip=False,
-                        trim_seconds=0.0,
-                        add_fade_in=True,
-                        add_fade_out=True,
-                        speed=1.0,
-                    )
+                content = response.message.content or ""
+                print(f">>> final response: {content}")
+
+                if content.strip():
+                    try:
+                        raw = content.strip().replace("```json", "").replace("```", "").strip()
+                        decisions = VlogDecisions.model_validate_json(raw)
+                        return decisions
+                    except Exception as e:
+                        print(f">>> failed to parse decisions: {e}")
+                        # Nudge the model to return JSON
+                        history.append({
+                            "role": "assistant",
+                            "content": content,
+                        })
+                        history.append({
+                            "role": "user",
+                            "content": "Return your final editing decisions as a raw JSON object only. No explanation, no markdown, no backticks.",
+                        })
 
         # Max iterations reached, return defaults
         print(">>> max iterations reached, using defaults")
