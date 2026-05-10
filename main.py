@@ -3,9 +3,9 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 import shutil
-import os
 
-from ollama_client import generate_vlog_decisions, get_clip_metadata
+from mcp_client import generate_vlog_decisions
+from ollama_client import get_clip_metadata
 from ffmpeg_runner import build_ffmpeg_command, run_ffmpeg
 
 app = FastAPI()
@@ -19,9 +19,11 @@ OUTPUTS_DIR.mkdir(exist_ok=True)
 # Serve static files (our frontend)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+
 @app.get("/")
 def root():
     return {"message": "Memories is here! Visit /upload to upload a video."}
+
 
 @app.post("/upload")
 async def upload_video(file: UploadFile = File(...)):
@@ -29,6 +31,7 @@ async def upload_video(file: UploadFile = File(...)):
     with destination.open("wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
     return {"filename": file.filename, "status": "uploaded"}
+
 
 @app.post("/stitch")
 async def stitch_videos(name: str = "vlog"):
@@ -40,17 +43,17 @@ async def stitch_videos(name: str = "vlog"):
 
     if len(filenames) == 0:
         return {"error": "No videos found in uploads folder"}
-    
-    metadata = get_clip_metadata(filenames)
-    print(f">>> metadata: {metadata}")
 
     for file in OUTPUTS_DIR.iterdir():
         if file.is_file():
             file.unlink()
 
-    # Ask Ollama to make editing decisions
-    decisions = generate_vlog_decisions(filenames, metadata)
-    print(f">>> Ollama decisions: {decisions}")
+    # Get decisions via MCP + Ollama tool calling
+    decisions = generate_vlog_decisions(filenames)
+    print(f">>> decisions: {decisions}")
+
+    # Get metadata for ffmpeg timing calculations
+    metadata = get_clip_metadata(filenames)
 
     output_filename = f"{name}.mp4"
     command = build_ffmpeg_command(filenames, output_filename, decisions, metadata)
@@ -66,14 +69,15 @@ async def stitch_videos(name: str = "vlog"):
         return {
             "status": "success",
             "output_filename": output_filename,
-            "decisions": decisions
+            "decisions": decisions.model_dump(),
         }
     else:
         return {
             "status": "error",
             "message": message,
-            "decisions": decisions
-        } 
+            "decisions": decisions.model_dump(),
+        }
+
 
 @app.post("/clear")
 def clear_files():
@@ -82,7 +86,8 @@ def clear_files():
             if file.is_file():
                 file.unlink()
     return {"status": "cleared"}
-    
+
+
 @app.get("/download")
 async def download_vlog():
     files = list(OUTPUTS_DIR.glob("*.mp4"))
@@ -91,5 +96,5 @@ async def download_vlog():
     return FileResponse(
         path=files[0],
         media_type="video/mp4",
-        filename=files[0].name
+        filename=files[0].name,
     )
