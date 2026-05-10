@@ -99,4 +99,5 @@ def get_shortest_clip() -> dict:
 
 
 if __name__ == "__main__":
-    mcp.run()
+    import uvicorn
+    uvicorn.run(mcp.sse_app(), host="0.0.0.0", port=8050)
