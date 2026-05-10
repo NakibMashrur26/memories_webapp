@@ -49,7 +49,7 @@ async def stitch_videos(name: str = "vlog"):
             file.unlink()
 
     # Get decisions via MCP + Ollama tool calling
-    decisions = generate_vlog_decisions(filenames)
+    decisions = await generate_vlog_decisions(filenames)
     print(f">>> decisions: {decisions}")
 
     # Get metadata for ffmpeg timing calculations

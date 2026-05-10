@@ -92,6 +92,13 @@ def get_clip_metadata(filenames: list[str]) -> list[dict]:
                 }
             )
         except:
-            clips.append({"index": i, "filename": name})
+            clips.append({
+                "index": i,
+                "filename": name, 
+                "duration_seconds": 0.0,
+                "size_mb": 0.0,
+                "width": "unknown",
+                "height": "unknown",
+            })
 
     return clips

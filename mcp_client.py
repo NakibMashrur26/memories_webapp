@@ -1,7 +1,7 @@
 import asyncio
 import json
 import ollama
-from fastmcp import Client
+from fastmcp.client import Client
 from pydantic import BaseModel
 
 
@@ -127,10 +127,8 @@ async def run_vlog_decisions(filenames: list[str]) -> VlogDecisions:
             speed=1.0,
         )
 
-
-def generate_vlog_decisions(filenames: list[str]) -> VlogDecisions:
-    return asyncio.run(run_vlog_decisions(filenames))
-
+async def generate_vlog_decisions(filenames: list[str]) -> VlogDecisions:
+    return await run_vlog_decisions(filenames)
 
 if __name__ == "__main__":
     # Quick test
