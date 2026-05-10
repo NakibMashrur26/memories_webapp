@@ -1,4 +1,8 @@
+import asyncio
+import json
+import ollama
 from pydantic import BaseModel
+from fastmcp.client import Client
 
 
 class VlogDecisions(BaseModel):
@@ -59,7 +63,7 @@ async def run_vlog_decisions(filenames: list[str]) -> VlogPlan:
         ]
 
         metadata = []
-        max_iterations = 20
+        max_iterations = 10
         iteration = 0
 
         while iteration < max_iterations:
@@ -88,8 +92,13 @@ async def run_vlog_decisions(filenames: list[str]) -> VlogPlan:
                         tool_call.function.arguments,
                     )
 
-                    print(f">>> tool result: {result}")
-
+                    if tool_call.function.name == "get_all_metadata":
+                        print(f">>> tool result: get_all_metadata returned {len(result.structured_content.get('result', []))} clips")
+                    elif tool_call.function.name == "get_clip_metadata":
+                        print(f">>> tool result: {result.content[0].text if result.content else 'no result'}")
+                    else:
+                        print(f">>> tool result: {result.structured_content or result.content[0].text}")
+                    
                     # Capture metadata if get_all_metadata was called
                     if tool_call.function.name == "get_all_metadata":
                         try:

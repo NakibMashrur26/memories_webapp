@@ -53,7 +53,7 @@ async def stitch_videos(name: str = "vlog"):
     metadata = plan.metadata
 
     print(f">>> decisions: {decisions}")
-    print(f">>> metadata: {metadata}")
+    print(f">>> metadata: {len(metadata)} clips loaded")
 
     output_filename = f"{name}.mp4"
     command = build_ffmpeg_command(filenames, output_filename, decisions, metadata)
