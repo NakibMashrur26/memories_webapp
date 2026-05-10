@@ -5,7 +5,6 @@ from pathlib import Path
 import shutil
 
 from mcp_client import generate_vlog_decisions
-from ollama_client import get_clip_metadata
 from ffmpeg_runner import build_ffmpeg_command, run_ffmpeg
 
 app = FastAPI()
@@ -48,12 +47,13 @@ async def stitch_videos(name: str = "vlog"):
         if file.is_file():
             file.unlink()
 
-    # Get decisions via MCP + Ollama tool calling
-    decisions = await generate_vlog_decisions(filenames)
-    print(f">>> decisions: {decisions}")
+    # Get decisions and metadata via MCP
+    plan = await generate_vlog_decisions(filenames)
+    decisions = plan.decisions
+    metadata = plan.metadata
 
-    # Get metadata for ffmpeg timing calculations
-    metadata = get_clip_metadata(filenames)
+    print(f">>> decisions: {decisions}")
+    print(f">>> metadata: {metadata}")
 
     output_filename = f"{name}.mp4"
     command = build_ffmpeg_command(filenames, output_filename, decisions, metadata)

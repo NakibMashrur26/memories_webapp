@@ -1,7 +1,3 @@
-import asyncio
-import json
-import ollama
-from fastmcp.client import Client
 from pydantic import BaseModel
 
 
@@ -12,12 +8,15 @@ class VlogDecisions(BaseModel):
     add_fade_out: bool
 
 
-async def run_vlog_decisions(filenames: list[str]) -> VlogDecisions:
+class VlogPlan(BaseModel):
+    decisions: VlogDecisions
+    metadata: list[dict]
+
+
+async def run_vlog_decisions(filenames: list[str]) -> VlogPlan:
     async with Client("http://localhost:8050/sse") as client:
-        # Get available tools from MCP server
         mcp_tools = await client.list_tools()
 
-        # Convert MCP tools to Ollama format
         ollama_tools = []
         for tool in mcp_tools:
             ollama_tools.append({
@@ -31,14 +30,13 @@ async def run_vlog_decisions(filenames: list[str]) -> VlogDecisions:
 
         print(f">>> available tools: {[t.name for t in mcp_tools]}")
 
-        # Initial prompt
         history = [
             {
                 "role": "system",
                 "content": (
                     "You are a professional video editor. "
-                    "Use the available tools to gather information about the clips, "
-                    "then make editing decisions. "
+                    "First call get_editing_guidelines to understand the rules. "
+                    "Then use the other tools to gather information about the clips. "
                     "When you have enough information, respond with ONLY a raw JSON object, "
                     "no explanation, no markdown, no backticks, nothing else. "
                     "The JSON must have exactly these fields: "
@@ -54,12 +52,13 @@ async def run_vlog_decisions(filenames: list[str]) -> VlogDecisions:
                 "role": "user",
                 "content": (
                     f"I have {len(filenames)} video clips to stitch into a vlog. "
-                    "Use the tools to analyze them and return your editing decisions as JSON."
+                    "First call get_editing_guidelines, then analyze the clips using the other tools, "
+                    "then return your editing decisions as a raw JSON object only."
                 ),
             },
         ]
 
-        # Tool calling loop
+        metadata = []
         max_iterations = 20
         iteration = 0
 
@@ -73,7 +72,6 @@ async def run_vlog_decisions(filenames: list[str]) -> VlogDecisions:
                 tools=ollama_tools,
             )
 
-            # If Ollama wants to call tools
             if response.message.tool_calls:
                 history.append({
                     "role": "assistant",
@@ -92,13 +90,19 @@ async def run_vlog_decisions(filenames: list[str]) -> VlogDecisions:
 
                     print(f">>> tool result: {result}")
 
+                    # Capture metadata if get_all_metadata was called
+                    if tool_call.function.name == "get_all_metadata":
+                        try:
+                            metadata = result.data.result
+                        except:
+                            pass
+
                     history.append({
                         "role": "tool",
                         "content": json.dumps(result) if isinstance(result, dict) else str(result),
                         "name": tool_call.function.name,
                     })
 
-            # No tool calls — try to parse final answer
             else:
                 content = response.message.content or ""
                 print(f">>> final response: {content}")
@@ -107,33 +111,42 @@ async def run_vlog_decisions(filenames: list[str]) -> VlogDecisions:
                     try:
                         raw = content.strip().replace("```json", "").replace("```", "").strip()
                         decisions = VlogDecisions.model_validate_json(raw)
-                        return decisions
+
+                        # If metadata wasn't captured via tool, fetch it now
+                        if not metadata:
+                            meta_result = await client.call_tool("get_all_metadata", {})
+                            try:
+                                metadata = meta_result.data.result
+                            except:
+                                metadata = []
+
+                        return VlogPlan(decisions=decisions, metadata=metadata)
                     except Exception as e:
                         print(f">>> failed to parse decisions: {e}")
-                        # Nudge the model to return JSON
-                        history.append({
-                            "role": "assistant",
-                            "content": content,
-                        })
+                        history.append({"role": "assistant", "content": content})
                         history.append({
                             "role": "user",
                             "content": "Return your final editing decisions as a raw JSON object only. No explanation, no markdown, no backticks.",
                         })
 
-        # Max iterations reached, return defaults
         print(">>> max iterations reached, using defaults")
-        return VlogDecisions(
-            trim_each_clip=False,
-            trim_seconds=0.0,
-            add_fade_in=True,
-            add_fade_out=True,
-            speed=1.0,
+        if not metadata:
+            meta_result = await client.call_tool("get_all_metadata", {})
+            try:
+                metadata = meta_result.data.result
+            except:
+                metadata = []
+
+        return VlogPlan(
+            decisions=VlogDecisions(
+                trim_each_clip=False,
+                trim_seconds=0.0,
+                add_fade_in=True,
+                add_fade_out=True,
+            ),
+            metadata=metadata,
         )
 
-async def generate_vlog_decisions(filenames: list[str]) -> VlogDecisions:
-    return await run_vlog_decisions(filenames)
 
-if __name__ == "__main__":
-    # Quick test
-    decisions = generate_vlog_decisions([])
-    print(f">>> decisions: {decisions}")
+async def generate_vlog_decisions(filenames: list[str]) -> VlogPlan:
+    return await run_vlog_decisions(filenames)

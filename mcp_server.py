@@ -7,6 +7,76 @@ mcp = FastMCP("Memories")
 
 UPLOADS_DIR = Path("uploads")
 
+@mcp.tool()
+def get_all_metadata() -> list[dict]:
+    """Returns metadata for all clips in the uploads folder."""
+    clips = sorted([
+        f.name for f in UPLOADS_DIR.iterdir()
+        if f.suffix.lower() in [".mp4", ".mov", ".m4v", ".avi"]
+    ])
+    results = []
+    for i, name in enumerate(clips):
+        result = subprocess.run(
+            f"ffprobe -v error -show_entries format=duration,size "
+            f"-show_entries stream=width,height "
+            f"-of json uploads/{name}",
+            shell=True,
+            capture_output=True,
+            text=True,
+        )
+        try:
+            info = json.loads(result.stdout)
+            fmt = info.get("format", {})
+            streams = info.get("streams", [{}])
+            results.append({
+                "index": i,
+                "filename": name,
+                "duration_seconds": round(float(fmt.get("duration", 0)), 1),
+                "size_mb": round(int(fmt.get("size", 0)) / 1024 / 1024, 1),
+                "width": streams[0].get("width", "unknown"),
+                "height": streams[0].get("height", "unknown"),
+            })
+        except:
+            results.append({
+                "index": i,
+                "filename": name,
+                "duration_seconds": 0.0,
+                "size_mb": 0.0,
+                "width": "unknown",
+                "height": "unknown",
+            })
+    return results
+
+@mcp.tool()
+def get_editing_guidelines() -> dict:
+    """Returns valid editing parameters and constraints for this vlog editor."""
+    return {
+        "trim_seconds": {
+            "description": "Maximum seconds to KEEP from each clip",
+            "minimum": 3.0,
+            "tip": "Must be greater than shortest clip duration. 0 means keep full clip. Never set below 3.0."
+        },
+        "trim_each_clip": {
+            "description": "Whether to trim clips to trim_seconds length",
+            "tip": "Set to true if any clip is significantly longer than others"
+        },
+        "add_fade_in": {
+            "description": "Fade in from black at the start of the vlog",
+            "tip": "true for cinematic feel"
+        },
+        "add_fade_out": {
+            "description": "Fade out to black at the end of the vlog",
+            "tip": "true for cinematic feel"
+        },
+        "constraints": [
+            "trim_seconds must be at least 3.0",
+            "trim_seconds 0 means keep full clip, do not trim",
+            "trim_seconds must never be less than the shortest clip duration",
+            "all clips play at normal speed, do not change speed",
+            "do not reorder clips"
+        ]
+    }
+
 
 @mcp.tool()
 def get_clip_list() -> list[str]:
