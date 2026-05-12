@@ -38,7 +38,7 @@ def build_ffmpeg_command(
             clip_meta = next((c for c in metadata if c["index"] == i), None)
             clip_duration = clip_meta["duration_seconds"] if clip_meta else 999
 
-            f.write(f"file '/{name}'\n")
+            f.write(f"file '{name}'\n")
             if trim and trim_secs > 0 and clip_duration > trim_secs:
                 f.write(f"duration {trim_secs}\n")
 
@@ -93,6 +93,7 @@ def run_ffmpeg(command: str) -> tuple[bool, str]:
         if result.returncode == 0:
             return True, "Success"
         else:
+            print(f">>> ffmpeg error: {result.stderr}")
             return False, result.stderr
 
     except Exception as e:
