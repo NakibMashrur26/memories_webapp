@@ -573,6 +573,9 @@
         uploadedFiles = [];
         clipGrid.innerHTML = "";
         updateUI();
+        outputVideo.pause();
+        outputVideo.removeAttribute('src');
+        outputVideo.load();
         setStatus("", "");
         outputSection.classList.remove("visible");
       });
