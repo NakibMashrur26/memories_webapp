@@ -168,6 +168,16 @@ def get_shortest_clip() -> dict:
     return {"filename": shortest, "duration_seconds": round(shortest_duration, 1)}
 
 
+@mcp.tool()
+def get_available_transitions() -> list[str]:
+    """Returns available transition types between clips."""
+    return ["cut", "crossfade"]
+
+@mcp.tool()
+def get_available_resolutions() -> list[str]:
+    """Returns available output resolutions."""
+    return ["720p", "1080p", "4k"]
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(mcp.sse_app(), host="0.0.0.0", port=8050)

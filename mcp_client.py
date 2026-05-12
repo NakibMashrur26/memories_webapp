@@ -11,6 +11,11 @@ class VlogDecisions(BaseModel):
     add_fade_in: bool
     add_fade_out: bool
 
+    transition: str          # "cut" or "crossfade"
+    output_resolution: str   # "1080p", "4k", "720p"
+    audio_normalize: bool    # normalize audio levels across clips
+    intro_text: str          # text overlay at start e.g. "Summer 2024"
+    outro_text: str          # text overlay at end
 
 class VlogPlan(BaseModel):
     decisions: VlogDecisions
