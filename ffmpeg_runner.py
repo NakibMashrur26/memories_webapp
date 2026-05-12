@@ -74,6 +74,8 @@ def build_ffmpeg_command(
         f"-i uploads/concat.txt "
         f"-c:v libx264 -c:a aac "
         f"-movflags +faststart "
+        f"-g 30 "
+        f"-keyint_min 30 "
         f"{filter_str} "
         f"outputs/{output_filename}"
     )
