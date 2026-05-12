@@ -38,6 +38,7 @@ async def stitch_videos(name: str = "vlog"):
     filenames = sorted([
         f.name for f in UPLOADS_DIR.iterdir()
         if f.suffix.lower() in [".mp4", ".mov", ".m4v", ".avi"]
+        and f.parent == UPLOADS_DIR
     ])
 
     if len(filenames) == 0:
