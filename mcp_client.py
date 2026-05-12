@@ -14,8 +14,6 @@ class VlogDecisions(BaseModel):
     transition: str          # "cut" or "crossfade"
     output_resolution: str   # "1080p", "4k", "720p"
     audio_normalize: bool    # normalize audio levels across clips
-    intro_text: str          # text overlay at start e.g. "Summer 2024"
-    outro_text: str          # text overlay at end
 
 class VlogPlan(BaseModel):
     decisions: VlogDecisions
@@ -50,11 +48,16 @@ async def run_vlog_decisions(filenames: list[str]) -> VlogPlan:
                     "no explanation, no markdown, no backticks, nothing else. "
                     "The JSON must have exactly these fields: "
                     "trim_each_clip (bool), trim_seconds (float), "
-                    "add_fade_in (bool), add_fade_out (bool). "
+                    "add_fade_in (bool), add_fade_out (bool), "
+                    "transition ('cut' or 'crossfade'), "
+                    "output_resolution ('720p', '1080p', or '4k'), "
+                    "audio_normalize (bool). "
                     "trim_seconds means the maximum number of seconds to KEEP from each clip. "
                     "For example, trim_seconds=5 means keep only the first 5 seconds of each clip. "
                     "trim_seconds must always be greater than the shortest clip duration or set to 0 to keep full clips. "
-                    "Never set trim_seconds below 3.0."
+                    "Never set trim_seconds below 3.0. "
+                    "Choose output_resolution based on the resolution of most clips. "
+                    "Set audio_normalize to true if clips likely have inconsistent volume."
                 ),
             },
             {
@@ -157,6 +160,9 @@ async def run_vlog_decisions(filenames: list[str]) -> VlogPlan:
                 trim_seconds=0.0,
                 add_fade_in=True,
                 add_fade_out=True,
+                transition="cut",
+                output_resolution="1080p",
+                audio_normalize=False,
             ),
             metadata=metadata,
         )

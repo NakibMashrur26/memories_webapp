@@ -1,6 +1,12 @@
 import subprocess
 from pathlib import Path
 
+RESOLUTION_MAP = {
+    "720p": "1280:720",
+    "1080p": "1920:1080",
+    "4k": "3840:2160",
+}
+
 
 def build_ffmpeg_command(
     filenames: list[str],
@@ -12,6 +18,8 @@ def build_ffmpeg_command(
     trim_secs = decisions.trim_seconds
     fade_in = decisions.add_fade_in
     fade_out = decisions.add_fade_out
+    output_resolution = getattr(decisions, "output_resolution", "1080p")
+    audio_normalize = getattr(decisions, "audio_normalize", False)
 
     # Calculate total duration ourselves — don't trust Ollama for this
     total_duration = 0.0
@@ -34,15 +42,24 @@ def build_ffmpeg_command(
             if trim and trim_secs > 0 and clip_duration > trim_secs:
                 f.write(f"duration {trim_secs}\n")
 
-    # Build filters
+    # Build video filters
     filters = []
     audio_filters = []
+
+    # Scale to output resolution
+    scale = RESOLUTION_MAP.get(output_resolution, "1920:1080")
+    filters.append(f"scale={scale}:force_original_aspect_ratio=decrease")
+    filters.append(f"pad={scale}:(ow-iw)/2:(oh-ih)/2")
 
     if fade_in:
         filters.append("fade=t=in:st=0:d=1")
 
     if fade_out and fade_out_start > 1:
         filters.append(f"fade=t=out:st={fade_out_start}:d=1")
+
+    # Build audio filters
+    if audio_normalize:
+        audio_filters.append("loudnorm")
 
     filter_str = ""
     if filters and audio_filters:
