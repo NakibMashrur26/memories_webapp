@@ -178,6 +178,51 @@ def get_available_resolutions() -> list[str]:
     """Returns available output resolutions."""
     return ["720p", "1080p", "4k"]
 
+@mcp.tool()
+def get_ffmpeg_capabilities() -> dict:
+    """Returns available ffmpeg filters, codecs and options for vlog editing."""
+    return {
+        "video_filters": {
+            "scale": "Resize video. Example: scale=1920:1080",
+            "fade": "Fade in/out. Example: fade=t=in:st=0:d=1",
+            "xfade": "Crossfade between clips. Example: xfade=transition=fade:duration=1",
+            "pad": "Add padding/letterbox. Example: pad=1920:1080:(ow-iw)/2:(oh-ih)/2",
+            "drawtext": "Text overlay. Example: drawtext=text='Hello':fontsize=48:fontcolor=white",
+            "crop": "Crop video. Example: crop=1280:720",
+            "setpts": "Change speed. Example: setpts=0.5*PTS for 2x speed",
+        },
+        "audio_filters": {
+            "loudnorm": "Normalize audio levels",
+            "volume": "Adjust volume. Example: volume=1.5",
+            "afade": "Audio fade. Example: afade=t=in:st=0:d=1",
+        },
+        "codecs": {
+            "video": "libx264 (H.264, most compatible)",
+            "audio": "aac (most compatible)",
+        },
+        "tips": [
+            "Always use -movflags +faststart for web playback",
+            "Use -f concat -safe 0 -i concat.txt to stitch clips",
+            "Clips are listed in uploads/concat.txt",
+            "Output goes to outputs/filename.mp4",
+            "Chain video filters with commas: -vf 'scale=1920:1080,fade=t=in:st=0:d=1'",
+        ]
+    }
+
+@mcp.tool()
+def validate_ffmpeg_command(command: str) -> dict:
+    """Validates an ffmpeg command by doing a dry run without encoding."""
+    result = subprocess.run(
+        f"{command} -t 0 -f null -",
+        shell=True,
+        capture_output=True,
+        text=True,
+    )
+    return {
+        "valid": result.returncode == 0,
+        "error": result.stderr[-500:] if result.returncode != 0 else None,
+    }
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(mcp.sse_app(), host="0.0.0.0", port=8050)

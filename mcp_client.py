@@ -10,13 +10,14 @@ class VlogDecisions(BaseModel):
     trim_seconds: float
     add_fade_in: bool
     add_fade_out: bool
+    transition: str = "cut"
+    output_resolution: str = "1080p"
+    audio_normalize: bool = False
 
-    transition: str          # "cut" or "crossfade"
-    output_resolution: str   # "1080p", "4k", "720p"
-    audio_normalize: bool    # normalize audio levels across clips
 
 class VlogPlan(BaseModel):
     decisions: VlogDecisions
+    ffmpeg_command: str = ""
     metadata: list[dict]
 
 
@@ -41,37 +42,37 @@ async def run_vlog_decisions(filenames: list[str]) -> VlogPlan:
             {
                 "role": "system",
                 "content": (
-                    "You are a professional video editor. "
-                    "First call get_editing_guidelines to understand the rules. "
-                    "Then use the other tools to gather information about the clips. "
-                    "When you have enough information, respond with ONLY a raw JSON object, "
-                    "no explanation, no markdown, no backticks, nothing else. "
-                    "The JSON must have exactly these fields: "
-                    "trim_each_clip (bool), trim_seconds (float), "
-                    "add_fade_in (bool), add_fade_out (bool), "
-                    "transition ('cut' or 'crossfade'), "
-                    "output_resolution ('720p', '1080p', or '4k'), "
-                    "audio_normalize (bool). "
-                    "trim_seconds means the maximum number of seconds to KEEP from each clip. "
-                    "For example, trim_seconds=5 means keep only the first 5 seconds of each clip. "
-                    "trim_seconds must always be greater than the shortest clip duration or set to 0 to keep full clips. "
-                    "Never set trim_seconds below 3.0. "
-                    "Choose output_resolution based on the resolution of most clips. "
-                    "Set audio_normalize to true if clips likely have inconsistent volume."
-                ),
+                    "You are a professional video editor with ffmpeg expertise. "
+                    "Follow these steps in order: "
+                    "1. Call get_editing_guidelines to understand constraints. "
+                    "2. Call get_all_metadata to analyze all clips in one call. "
+                    "3. Call get_ffmpeg_capabilities to understand available filters. "
+                    "4. Build an ffmpeg command and call validate_ffmpeg_command to check it. "
+                    "5. If valid, return ONLY a raw JSON object with this exact structure: "
+                    '{"ffmpeg_command": "your ffmpeg command here"} '
+                    "No explanation, no markdown, no backticks, nothing else. "
+                    "The ffmpeg command must: "
+                    "use -f concat -safe 0 -i uploads/concat.txt as input, "
+                    "output to outputs/OUTPUT_FILENAME, "
+                    "use -c:v libx264 -c:a aac -movflags +faststart."
+                    "The ffmpeg command must start with 'ffmpeg -y' and "
+                    "replace OUTPUT_FILENAME with the actual output filename."
+               ),
             },
             {
                 "role": "user",
                 "content": (
                     f"I have {len(filenames)} video clips to stitch into a vlog. "
-                    "First call get_editing_guidelines, then analyze the clips using the other tools, "
-                    "then return your editing decisions as a raw JSON object only."
+                    "The output filename is OUTPUT_FILENAME. "
+                    "Follow the steps: get_editing_guidelines, get_all_metadata, "
+                    "get_ffmpeg_capabilities, build command, validate_ffmpeg_command, "
+                    "then return the JSON with ffmpeg_command."
                 ),
             },
         ]
 
         metadata = []
-        max_iterations = 10
+        max_iterations = 25
         iteration = 0
 
         while iteration < max_iterations:
@@ -106,7 +107,7 @@ async def run_vlog_decisions(filenames: list[str]) -> VlogPlan:
                         print(f">>> tool result: {result.content[0].text if result.content else 'no result'}")
                     else:
                         print(f">>> tool result: {result.structured_content or result.content[0].text}")
-                    
+
                     # Capture metadata if get_all_metadata was called
                     if tool_call.function.name == "get_all_metadata":
                         try:
@@ -127,7 +128,7 @@ async def run_vlog_decisions(filenames: list[str]) -> VlogPlan:
                 if content.strip():
                     try:
                         raw = content.strip().replace("```json", "").replace("```", "").strip()
-                        decisions = VlogDecisions.model_validate_json(raw)
+                        parsed = json.loads(raw)
 
                         # If metadata wasn't captured via tool, fetch it now
                         if not metadata:
@@ -137,13 +138,36 @@ async def run_vlog_decisions(filenames: list[str]) -> VlogPlan:
                             except:
                                 metadata = []
 
+                        # Check if model returned ffmpeg_command directly
+                        if "ffmpeg_command" in parsed:
+                            return VlogPlan(
+                                decisions=VlogDecisions(
+                                    trim_each_clip=False,
+                                    trim_seconds=0.0,
+                                    add_fade_in=True,
+                                    add_fade_out=True,
+                                    transition="cut",
+                                    output_resolution="1080p",
+                                    audio_normalize=False,
+                                ),
+                                ffmpeg_command=parsed["ffmpeg_command"],
+                                metadata=metadata,
+                            )
+
+                        # Otherwise try to parse as VlogDecisions
+                        decisions = VlogDecisions.model_validate_json(raw)
                         return VlogPlan(decisions=decisions, metadata=metadata)
+
                     except Exception as e:
                         print(f">>> failed to parse decisions: {e}")
                         history.append({"role": "assistant", "content": content})
                         history.append({
                             "role": "user",
-                            "content": "Return your final editing decisions as a raw JSON object only. No explanation, no markdown, no backticks.",
+                            "content": (
+                                "Return ONLY a raw JSON object with this structure: "
+                                '{"ffmpeg_command": "your ffmpeg command here"} '
+                                "No explanation, no markdown, no backticks."
+                            ),
                         })
 
         print(">>> max iterations reached, using defaults")
