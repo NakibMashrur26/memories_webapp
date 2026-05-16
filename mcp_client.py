@@ -1,7 +1,7 @@
 import json
 import ollama
 from pydantic import BaseModel
-from fastmcp.client import Client
+from fastmcp.client import Client # type: ignore
 
 
 class VlogDecisions(BaseModel):
