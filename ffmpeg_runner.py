@@ -7,6 +7,30 @@ RESOLUTION_MAP = {
     "4k": "3840:2160",
 }
 
+STYLE_TEMPLATES = {
+    "cinematic": {
+        "crf": 18,
+        "preset": "slow",
+        "fade_in_duration": 2.0,
+        "fade_out_duration": 2.0,
+        "audio_normalize": True,
+    },
+    "youtube": {
+        "crf": 23,
+        "preset": "veryfast",
+        "fade_in_duration": 0.5,
+        "fade_out_duration": 1.0,
+        "audio_normalize": True,
+    },
+    "homevideo": {
+        "crf": 23,
+        "preset": "fast",
+        "fade_in_duration": 0,
+        "fade_out_duration": 0,
+        "audio_normalize": False,
+    },
+}
+
 
 def build_ffmpeg_command(
     filenames: list[str],
@@ -14,14 +38,20 @@ def build_ffmpeg_command(
     decisions,
     metadata: list[dict],
 ) -> str:
+    style = getattr(decisions, "style", "homevideo")
     trim = decisions.trim_each_clip
     trim_secs = decisions.trim_seconds
-    fade_in = decisions.add_fade_in
-    fade_out = decisions.add_fade_out
     output_resolution = getattr(decisions, "output_resolution", "1080p")
-    audio_normalize = getattr(decisions, "audio_normalize", False)
 
-    # Calculate total duration ourselves — don't trust Ollama for this
+    # Get style template
+    template = STYLE_TEMPLATES.get(style, STYLE_TEMPLATES["homevideo"])
+    crf = template["crf"]
+    preset = template["preset"]
+    fade_in_duration = template["fade_in_duration"]
+    fade_out_duration = template["fade_out_duration"]
+    audio_normalize = template["audio_normalize"]
+
+    # Calculate total duration
     total_duration = 0.0
     for i, name in enumerate(filenames):
         clip_meta = next((c for c in metadata if c["index"] == i), None)
@@ -29,16 +59,17 @@ def build_ffmpeg_command(
             duration = clip_meta["duration_seconds"]
             total_duration += min(duration, trim_secs) if trim and trim_secs > 0 else duration
 
-    fade_out_start = round(total_duration - 1, 1)
+    fade_out_start = round(total_duration - fade_out_duration, 1)
 
-    # Write concat file in original order
+    # Write concat file
+    upload_path = Path("uploads").resolve()
     concat_path = Path("uploads/concat.txt")
     with concat_path.open("w") as f:
         for i, name in enumerate(filenames):
             clip_meta = next((c for c in metadata if c["index"] == i), None)
             clip_duration = clip_meta["duration_seconds"] if clip_meta else 999
 
-            f.write(f"file '{name}'\n")
+            f.write(f"file '{upload_path}/{name}'\n")
             if trim and trim_secs > 0 and clip_duration > trim_secs:
                 f.write(f"duration {trim_secs}\n")
 
@@ -51,13 +82,12 @@ def build_ffmpeg_command(
     filters.append(f"scale={scale}:force_original_aspect_ratio=decrease")
     filters.append(f"pad={scale}:(ow-iw)/2:(oh-ih)/2")
 
-    if fade_in:
-        filters.append("fade=t=in:st=0:d=1")
+    if fade_in_duration > 0:
+        filters.append(f"fade=t=in:st=0:d={fade_in_duration}")
 
-    if fade_out and fade_out_start > 1:
-        filters.append(f"fade=t=out:st={fade_out_start}:d=1")
+    if fade_out_duration > 0 and fade_out_start > 0:
+        filters.append(f"fade=t=out:st={fade_out_start}:d={fade_out_duration}")
 
-    # Build audio filters
     if audio_normalize:
         audio_filters.append("loudnorm")
 
@@ -73,9 +103,9 @@ def build_ffmpeg_command(
         f"ffmpeg -y -f concat -safe 0 "
         f"-i uploads/concat.txt "
         f"-c:v libx264 -c:a aac "
+        f"-crf {crf} -preset {preset} "
         f"-movflags +faststart "
-        f"-g 30 "
-        f"-keyint_min 30 "
+        f"-g 30 -keyint_min 30 "
         f"{filter_str} "
         f"outputs/{output_filename}"
     )
@@ -100,8 +130,10 @@ def run_ffmpeg(command: str) -> tuple[bool, str]:
 
     except Exception as e:
         return False, str(e)
-    
 
+
+# Normalization — currently shelved, use when ready
+# See NOTES.md for planned improvements
 def normalize_clips(filenames: list[str]) -> list[str]:
     norm_dir = Path("uploads/normalized")
     norm_dir.mkdir(exist_ok=True)

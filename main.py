@@ -54,30 +54,11 @@ async def stitch_videos(name: str = "vlog"):
     metadata = plan.metadata
 
     print(f">>> decisions: {decisions}")
+    print(f">>> style: {decisions.style}")
     print(f">>> metadata: {len(metadata)} clips loaded")
 
     output_filename = f"{name}.mp4"
-
-    # Use model ffmpeg command if provided, otherwise build it ourselves
-    if plan.ffmpeg_command:
-        print(f">>> using model generated ffmpeg command")
-        command = plan.ffmpeg_command
-            # Ensure ffmpeg prefix
-        if not command.strip().startswith("ffmpeg"):
-            command = f"ffmpeg -y {command}"
-    
-        # Replace OUTPUT_FILENAME placeholder
-        command = command.replace("OUTPUT_FILENAME", output_filename)
-        # Write concat.txt since we're bypassing build_ffmpeg_command
-        concat_path = Path("uploads/concat.txt")
-        with concat_path.open("w") as f:
-            for clip in filenames:
-                f.write(f"file '{clip}'\n")
-
-    else:
-        print(f">>> using generated ffmpeg command")
-        command = build_ffmpeg_command(filenames, output_filename, decisions, metadata)
-
+    command = build_ffmpeg_command(filenames, output_filename, decisions, metadata)
     print(f">>> ffmpeg command: {command}")
 
     success, message = run_ffmpeg(command)
@@ -90,12 +71,14 @@ async def stitch_videos(name: str = "vlog"):
         return {
             "status": "success",
             "output_filename": output_filename,
+            "style": decisions.style,
             "decisions": decisions.model_dump(),
         }
     else:
         return {
             "status": "error",
             "message": message,
+            "style": decisions.style,
             "decisions": decisions.model_dump(),
         }
 

@@ -7,6 +7,32 @@ mcp = FastMCP("Memories")
 
 UPLOADS_DIR = Path("uploads")
 
+
+@mcp.tool()
+def get_available_styles() -> dict:
+    """Returns available vlog editing styles with descriptions."""
+    return {
+        "cinematic": {
+            "description": "Slow fades, high quality encoding, audio normalization. Best for travel vlogs and dramatic content.",
+            "fade_in": "2 second fade in",
+            "fade_out": "2 second fade out",
+            "quality": "High (CRF 18)",
+        },
+        "youtube": {
+            "description": "Fast cuts, energetic feel, audio normalization. Best for action, lifestyle or tutorial content.",
+            "fade_in": "0.5 second fade in",
+            "fade_out": "1 second fade out",
+            "quality": "Standard (CRF 23)",
+        },
+        "homevideo": {
+            "description": "Clean cuts, no effects, fast encoding. Best for family memories and casual recordings.",
+            "fade_in": "None",
+            "fade_out": "None",
+            "quality": "Standard (CRF 23)",
+        },
+    }
+
+
 @mcp.tool()
 def get_all_metadata() -> list[dict]:
     """Returns metadata for all clips in the uploads folder."""
@@ -46,36 +72,6 @@ def get_all_metadata() -> list[dict]:
                 "height": "unknown",
             })
     return results
-
-@mcp.tool()
-def get_editing_guidelines() -> dict:
-    """Returns valid editing parameters and constraints for this vlog editor."""
-    return {
-        "trim_seconds": {
-            "description": "Maximum seconds to KEEP from each clip",
-            "minimum": 3.0,
-            "tip": "Must be greater than shortest clip duration. 0 means keep full clip. Never set below 3.0."
-        },
-        "trim_each_clip": {
-            "description": "Whether to trim clips to trim_seconds length",
-            "tip": "Set to true if any clip is significantly longer than others"
-        },
-        "add_fade_in": {
-            "description": "Fade in from black at the start of the vlog",
-            "tip": "true for cinematic feel"
-        },
-        "add_fade_out": {
-            "description": "Fade out to black at the end of the vlog",
-            "tip": "true for cinematic feel"
-        },
-        "constraints": [
-            "trim_seconds must be at least 3.0",
-            "trim_seconds 0 means keep full clip, do not trim",
-            "trim_seconds must never be less than the shortest clip duration",
-            "all clips play at normal speed, do not change speed",
-            "do not reorder clips"
-        ]
-    }
 
 
 @mcp.tool()
@@ -169,59 +165,10 @@ def get_shortest_clip() -> dict:
 
 
 @mcp.tool()
-def get_available_transitions() -> list[str]:
-    """Returns available transition types between clips."""
-    return ["cut", "crossfade"]
-
-@mcp.tool()
 def get_available_resolutions() -> list[str]:
     """Returns available output resolutions."""
     return ["720p", "1080p", "4k"]
 
-@mcp.tool()
-def get_ffmpeg_capabilities() -> dict:
-    """Returns available ffmpeg filters, codecs and options for vlog editing."""
-    return {
-        "video_filters": {
-            "scale": "Resize video. Example: scale=1920:1080",
-            "fade": "Fade in/out. Example: fade=t=in:st=0:d=1",
-            "xfade": "Crossfade between clips. Example: xfade=transition=fade:duration=1",
-            "pad": "Add padding/letterbox. Example: pad=1920:1080:(ow-iw)/2:(oh-ih)/2",
-            "drawtext": "Text overlay. Example: drawtext=text='Hello':fontsize=48:fontcolor=white",
-            "crop": "Crop video. Example: crop=1280:720",
-            "setpts": "Change speed. Example: setpts=0.5*PTS for 2x speed",
-        },
-        "audio_filters": {
-            "loudnorm": "Normalize audio levels",
-            "volume": "Adjust volume. Example: volume=1.5",
-            "afade": "Audio fade. Example: afade=t=in:st=0:d=1",
-        },
-        "codecs": {
-            "video": "libx264 (H.264, most compatible)",
-            "audio": "aac (most compatible)",
-        },
-        "tips": [
-            "Always use -movflags +faststart for web playback",
-            "Use -f concat -safe 0 -i concat.txt to stitch clips",
-            "Clips are listed in uploads/concat.txt",
-            "Output goes to outputs/filename.mp4",
-            "Chain video filters with commas: -vf 'scale=1920:1080,fade=t=in:st=0:d=1'",
-        ]
-    }
-
-@mcp.tool()
-def validate_ffmpeg_command(command: str) -> dict:
-    """Validates an ffmpeg command by doing a dry run without encoding."""
-    result = subprocess.run(
-        f"{command} -t 0 -f null -",
-        shell=True,
-        capture_output=True,
-        text=True,
-    )
-    return {
-        "valid": result.returncode == 0,
-        "error": result.stderr[-500:] if result.returncode != 0 else None,
-    }
 
 if __name__ == "__main__":
     import uvicorn
