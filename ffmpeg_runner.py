@@ -8,12 +8,12 @@ RESOLUTION_MAP = {
 }
 
 STYLE_TEMPLATES = {
-    "cinematic": {
-        "crf": 18,
-        "preset": "slow",
-        "fade_in_duration": 2.0,
-        "fade_out_duration": 2.0,
-        "audio_normalize": True,
+    "homevideo": {
+        "crf": 23,
+        "preset": "fast",
+        "fade_in_duration": 0,
+        "fade_out_duration": 0,
+        "audio_normalize": False,
     },
     "youtube": {
         "crf": 23,
@@ -22,12 +22,12 @@ STYLE_TEMPLATES = {
         "fade_out_duration": 1.0,
         "audio_normalize": True,
     },
-    "homevideo": {
-        "crf": 23,
-        "preset": "fast",
-        "fade_in_duration": 0,
-        "fade_out_duration": 0,
-        "audio_normalize": False,
+    "cinematic": {
+        "crf": 18,
+        "preset": "slow",
+        "fade_in_duration": 2.0,
+        "fade_out_duration": 2.0,
+        "audio_normalize": True,
     },
 }
 
@@ -61,7 +61,7 @@ def build_ffmpeg_command(
 
     fade_out_start = round(total_duration - fade_out_duration, 1)
 
-    # Write concat file
+    # Write concat file using absolute paths
     upload_path = Path("uploads").resolve()
     concat_path = Path("uploads/concat.txt")
     with concat_path.open("w") as f:

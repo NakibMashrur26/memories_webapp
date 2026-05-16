@@ -5,10 +5,10 @@ from fastmcp.client import Client
 
 
 class VlogDecisions(BaseModel):
-    style: str = "homevideo"          # "cinematic", "youtube", "homevideo"
+    style: str = "homevideo"
     trim_each_clip: bool = False
     trim_seconds: float = 0.0
-    output_resolution: str = "1080p"  # "720p", "1080p", "4k"
+    output_resolution: str = "1080p"
 
 
 class VlogPlan(BaseModel):
@@ -16,7 +16,38 @@ class VlogPlan(BaseModel):
     metadata: list[dict]
 
 
-async def run_vlog_decisions(filenames: list[str]) -> VlogPlan:
+STYLE_PROMPTS = {
+    "homevideo": (
+        "The user has chosen the Home Video style. "
+        "This means: clean cuts, no fades, fast encoding. "
+        "Your job is to decide: "
+        "whether to trim clips (trim_each_clip), "
+        "how long to keep each clip (trim_seconds, 0 = keep full clip), "
+        "and output resolution based on clip resolution. "
+        "Keep it simple — preserve the natural feel of the footage."
+    ),
+    "youtube": (
+        "The user has chosen the YouTube style. "
+        "This means: fast cuts, energetic feel, audio normalization. "
+        "Your job is to decide: "
+        "whether to trim clips (trim_each_clip) to keep pace up, "
+        "how long to keep each clip (trim_seconds, 0 = keep full clip), "
+        "and output resolution based on clip resolution. "
+        "Trim aggressively if clips are long — YouTube viewers want fast pacing."
+    ),
+    "cinematic": (
+        "The user has chosen the Cinematic style. "
+        "This means: slow fades, high quality encoding, dramatic feel. "
+        "Your job is to decide: "
+        "whether to trim clips (trim_each_clip), "
+        "how long to keep each clip (trim_seconds, 0 = keep full clip), "
+        "and output resolution — prefer higher resolution for cinematic quality. "
+        "Be selective with trimming — cinematic style benefits from longer, breathing shots."
+    ),
+}
+
+
+async def run_vlog_decisions(filenames: list[str], style: str = "homevideo") -> VlogPlan:
     async with Client("http://localhost:8050/sse") as client:
         mcp_tools = await client.list_tools()
 
@@ -33,33 +64,33 @@ async def run_vlog_decisions(filenames: list[str]) -> VlogPlan:
 
         print(f">>> available tools: {[t.name for t in mcp_tools]}")
 
+        style_guidance = STYLE_PROMPTS.get(style, STYLE_PROMPTS["homevideo"])
+
         history = [
             {
                 "role": "system",
                 "content": (
                     "You are a professional video editor. "
-                    "Follow these steps in order: "
-                    "1. Call get_available_styles to understand the style options. "
-                    "2. Call get_all_metadata to analyze all clips. "
-                    "3. Call get_shortest_clip to know the minimum clip duration. "
-                    "When you have enough information, respond with ONLY a raw JSON object, "
+                    f"{style_guidance} "
+                    "Follow these steps: "
+                    "1. Call get_all_metadata to analyze all clips. "
+                    "2. Call get_shortest_clip to know the minimum clip duration. "
+                    "3. Call get_available_resolutions to see resolution options. "
+                    "Then respond with ONLY a raw JSON object, "
                     "no explanation, no markdown, no backticks, nothing else. "
                     "The JSON must have exactly these fields: "
-                    "style (one of 'cinematic', 'youtube', 'homevideo'), "
+                    f"style (must be '{style}'), "
                     "trim_each_clip (bool), "
                     "trim_seconds (float, 0 means no trim, must be at least 3.0 if trimming), "
                     "output_resolution (one of '720p', '1080p', '4k'). "
-                    "Choose style based on clip content and total duration. "
-                    "Choose output_resolution based on the resolution of most clips. "
-                    "Set trim_each_clip to true only if clips are significantly different in length. "
                     "trim_seconds must never be less than the shortest clip duration."
                 ),
             },
             {
                 "role": "user",
                 "content": (
-                    f"I have {len(filenames)} video clips to stitch into a vlog. "
-                    "Call get_available_styles, then get_all_metadata, then get_shortest_clip, "
+                    f"I have {len(filenames)} video clips to stitch into a {style} style vlog. "
+                    "Call get_all_metadata, then get_shortest_clip, then get_available_resolutions, "
                     "then return your editing decisions as a raw JSON object only."
                 ),
             },
@@ -121,6 +152,9 @@ async def run_vlog_decisions(filenames: list[str]) -> VlogPlan:
                         raw = content.strip().replace("```json", "").replace("```", "").strip()
                         decisions = VlogDecisions.model_validate_json(raw)
 
+                        # Ensure style always matches what user selected
+                        decisions.style = style
+
                         # Fetch metadata if not captured yet
                         if not metadata:
                             meta_result = await client.call_tool("get_all_metadata", {})
@@ -129,7 +163,6 @@ async def run_vlog_decisions(filenames: list[str]) -> VlogPlan:
                             except:
                                 metadata = []
 
-                        print(f">>> decisions: {decisions}")
                         return VlogPlan(decisions=decisions, metadata=metadata)
 
                     except Exception as e:
@@ -138,8 +171,8 @@ async def run_vlog_decisions(filenames: list[str]) -> VlogPlan:
                         history.append({
                             "role": "user",
                             "content": (
-                                "Return ONLY a raw JSON object with exactly these fields: "
-                                "style ('cinematic', 'youtube', or 'homevideo'), "
+                                f"Return ONLY a raw JSON object with exactly these fields: "
+                                f"style (must be '{style}'), "
                                 "trim_each_clip (bool), trim_seconds (float), "
                                 "output_resolution ('720p', '1080p', or '4k'). "
                                 "No explanation, no markdown, no backticks."
@@ -156,7 +189,7 @@ async def run_vlog_decisions(filenames: list[str]) -> VlogPlan:
 
         return VlogPlan(
             decisions=VlogDecisions(
-                style="homevideo",
+                style=style,
                 trim_each_clip=False,
                 trim_seconds=0.0,
                 output_resolution="1080p",
@@ -165,5 +198,5 @@ async def run_vlog_decisions(filenames: list[str]) -> VlogPlan:
         )
 
 
-async def generate_vlog_decisions(filenames: list[str]) -> VlogPlan:
-    return await run_vlog_decisions(filenames)
+async def generate_vlog_decisions(filenames: list[str], style: str = "homevideo") -> VlogPlan:
+    return await run_vlog_decisions(filenames, style)

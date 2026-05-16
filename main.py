@@ -33,8 +33,10 @@ async def upload_video(file: UploadFile = File(...)):
 
 
 @app.post("/stitch")
-async def stitch_videos(name: str = "vlog"):
+async def stitch_videos(name: str = "vlog", style: str = "homevideo"):
     print(">>> stitch endpoint hit")
+    print(f">>> style selected by user: {style}")
+
     filenames = sorted([
         f.name for f in UPLOADS_DIR.iterdir()
         if f.suffix.lower() in [".mp4", ".mov", ".m4v", ".avi"]
@@ -48,8 +50,8 @@ async def stitch_videos(name: str = "vlog"):
         if file.is_file():
             file.unlink()
 
-    # Get decisions and metadata via MCP
-    plan = await generate_vlog_decisions(filenames)
+    # Get decisions and metadata via MCP, passing user's style choice
+    plan = await generate_vlog_decisions(filenames, style)
     decisions = plan.decisions
     metadata = plan.metadata
 
