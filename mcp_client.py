@@ -1,7 +1,7 @@
 import json
 import ollama
 from pydantic import BaseModel
-from fastmcp.client import Client # type: ignore
+from fastmcp.client import Client
 
 
 class VlogDecisions(BaseModel):
@@ -33,7 +33,8 @@ STYLE_PROMPTS = {
         "whether to trim clips (trim_each_clip) to keep pace up, "
         "how long to keep each clip (trim_seconds, 0 = keep full clip), "
         "and output resolution based on clip resolution. "
-        "Trim aggressively if clips are long — YouTube viewers want fast pacing."
+        "Trim aggressively if clips are long — YouTube viewers want fast pacing. "
+        "If clips are already short (under 10 seconds), set trim_each_clip to false."
     ),
     "cinematic": (
         "The user has chosen the Cinematic style. "
@@ -64,6 +65,18 @@ async def run_vlog_decisions(filenames: list[str], style: str = "homevideo") -> 
 
         print(f">>> available tools: {[t.name for t in mcp_tools]}")
 
+        # Fetch metadata and shortest clip upfront so we can pass constraints to prompt
+        metadata = []
+        shortest_duration = 0.0
+        try:
+            meta_result = await client.call_tool("get_all_metadata", {})
+            metadata = meta_result.data.result
+            shortest_result = await client.call_tool("get_shortest_clip", {})
+            shortest_duration = shortest_result.data.duration_seconds
+            print(f">>> pre-fetched {len(metadata)} clips, shortest: {shortest_duration}s")
+        except Exception as e:
+            print(f">>> pre-fetch failed: {e}")
+
         style_guidance = STYLE_PROMPTS.get(style, STYLE_PROMPTS["homevideo"])
 
         history = [
@@ -72,32 +85,31 @@ async def run_vlog_decisions(filenames: list[str], style: str = "homevideo") -> 
                 "content": (
                     "You are a professional video editor. "
                     f"{style_guidance} "
-                    "Follow these steps: "
-                    "1. Call get_all_metadata to analyze all clips. "
-                    "2. Call get_shortest_clip to know the minimum clip duration. "
-                    "3. Call get_available_resolutions to see resolution options. "
-                    "Then respond with ONLY a raw JSON object, "
+                    "The clip metadata has already been fetched for you. "
+                    "Respond with ONLY a raw JSON object, "
                     "no explanation, no markdown, no backticks, nothing else. "
                     "The JSON must have exactly these fields: "
                     f"style (must be '{style}'), "
                     "trim_each_clip (bool), "
-                    "trim_seconds (float, 0 means no trim, must be at least 3.0 if trimming), "
+                    "trim_seconds (float, 0 means no trim), "
                     "output_resolution (one of '720p', '1080p', '4k'). "
-                    "trim_seconds must never be less than the shortest clip duration."
+                    f"IMPORTANT: trim_seconds must be 0 (no trim) or greater than {shortest_duration} seconds. "
+                    f"The shortest clip is {shortest_duration} seconds — never set trim_seconds below this value. "
+                    "If clips are already short, set trim_each_clip to false and trim_seconds to 0."
                 ),
             },
             {
                 "role": "user",
                 "content": (
                     f"I have {len(filenames)} video clips to stitch into a {style} style vlog. "
-                    "Call get_all_metadata, then get_shortest_clip, then get_available_resolutions, "
-                    "then return your editing decisions as a raw JSON object only."
+                    f"Here is the metadata: {json.dumps(metadata)}. "
+                    f"The shortest clip is {shortest_duration} seconds. "
+                    "Return your editing decisions as a raw JSON object only."
                 ),
             },
         ]
 
-        metadata = []
-        max_iterations = 15
+        max_iterations = 10
         iteration = 0
 
         while iteration < max_iterations:
@@ -155,13 +167,11 @@ async def run_vlog_decisions(filenames: list[str], style: str = "homevideo") -> 
                         # Ensure style always matches what user selected
                         decisions.style = style
 
-                        # Fetch metadata if not captured yet
-                        if not metadata:
-                            meta_result = await client.call_tool("get_all_metadata", {})
-                            try:
-                                metadata = meta_result.data.result
-                            except:
-                                metadata = []
+                        # Safety net — if trim_seconds is below shortest clip, disable trimming
+                        if decisions.trim_each_clip and decisions.trim_seconds < shortest_duration:
+                            print(f">>> trim_seconds {decisions.trim_seconds} below shortest clip {shortest_duration}, disabling trim")
+                            decisions.trim_each_clip = False
+                            decisions.trim_seconds = 0.0
 
                         return VlogPlan(decisions=decisions, metadata=metadata)
 
@@ -180,13 +190,6 @@ async def run_vlog_decisions(filenames: list[str], style: str = "homevideo") -> 
                         })
 
         print(">>> max iterations reached, using defaults")
-        if not metadata:
-            meta_result = await client.call_tool("get_all_metadata", {})
-            try:
-                metadata = meta_result.data.result
-            except:
-                metadata = []
-
         return VlogPlan(
             decisions=VlogDecisions(
                 style=style,

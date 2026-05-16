@@ -51,27 +51,33 @@ def build_ffmpeg_command(
     fade_out_duration = template["fade_out_duration"]
     audio_normalize = template["audio_normalize"]
 
-    # Calculate total duration
-    total_duration = 0.0
-    for i, name in enumerate(filenames):
-        clip_meta = next((c for c in metadata if c["index"] == i), None)
-        if clip_meta:
-            duration = clip_meta["duration_seconds"]
-            total_duration += min(duration, trim_secs) if trim and trim_secs > 0 else duration
-
-    fade_out_start = round(total_duration - fade_out_duration, 1)
-
     # Write concat file using absolute paths
+    # Skip clips shorter than trim_secs to avoid ffmpeg errors
     upload_path = Path("uploads").resolve()
     concat_path = Path("uploads/concat.txt")
+    included_durations = []
+
     with concat_path.open("w") as f:
         for i, name in enumerate(filenames):
             clip_meta = next((c for c in metadata if c["index"] == i), None)
             clip_duration = clip_meta["duration_seconds"] if clip_meta else 999
 
+            # Skip clips shorter than trim duration
+            if trim and trim_secs > 0 and clip_duration < trim_secs:
+                print(f">>> skipping {name} — too short ({clip_duration}s < {trim_secs}s)")
+                continue
+
             f.write(f"file '{upload_path}/{name}'\n")
             if trim and trim_secs > 0 and clip_duration > trim_secs:
                 f.write(f"duration {trim_secs}\n")
+                included_durations.append(trim_secs)
+            else:
+                included_durations.append(clip_duration)
+
+    # Calculate total duration from included clips only
+    total_duration = sum(included_durations)
+    fade_out_start = round(total_duration - fade_out_duration, 1)
+    print(f">>> included {len(included_durations)} clips, total duration: {round(total_duration, 1)}s")
 
     # Build video filters
     filters = []
