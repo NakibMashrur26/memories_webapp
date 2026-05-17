@@ -75,9 +75,10 @@ Visit **http://localhost** in your browser.
 
 1. Open **http://localhost**
 2. Drag and drop your video clips (MP4, MOV, M4V supported)
-3. Give your vlog a name
-4. Click **Create vlog**
-5. Watch the video preview and download when ready
+3. Choose a style: homevideo, youtube, or cinematic
+4. Give your vlog a name
+5. Click **Create vlog**
+6. Watch the video preview and download when ready
 
 ---
 
@@ -88,15 +89,17 @@ memories_webapp/
 ├── main.py              # FastAPI app — routes and endpoints
 ├── ollama_client.py     # Ollama integration — LLM decisions
 ├── ffmpeg_runner.py     # ffmpeg execution — video stitching
-├── static/
-│   └── index.html       # Frontend UI
+├── server/
+│   ├── mcp_client.py    # MCP protocol client
+│   └── mcp_server.py    # MCP protocol server
+├── client/              # Frontend static files
 ├── uploads/             # Temporary clip storage (auto-cleared)
 ├── outputs/             # Finished vlogs
 ├── Dockerfile           # FastAPI + ffmpeg container
 ├── docker-compose.yml   # Wires FastAPI + Ollama + Nginx
 ├── nginx.conf           # Nginx reverse proxy config
 ├── requirements.txt     # Python dependencies
-└── NOTES.md             # Dev notes and future milestones
+└── CLAUDE.md            # Development guidelines
 ```
 
 ---
@@ -106,7 +109,7 @@ memories_webapp/
 | Method | Endpoint | Description |
 |---|---|---|
 | `POST` | `/upload` | Upload a video clip |
-| `POST` | `/stitch?name=myvlog` | Stitch uploaded clips into a vlog |
+| `POST` | `/stitch?name=myvlog&style=homevideo` | Stitch uploaded clips into a vlog |
 | `GET` | `/download` | Download the finished vlog |
 | `POST` | `/clear` | Clear uploads and outputs |
 
@@ -114,7 +117,7 @@ memories_webapp/
 
 ## How Ollama makes decisions
 
-Ollama receives metadata about each clip (duration, resolution, file size) and returns structured editing decisions:
+Ollama receives metadata about each clip (duration, resolution, file size, chronological order) and returns structured editing decisions:
 
 ```json
 {
@@ -122,11 +125,24 @@ Ollama receives metadata about each clip (duration, resolution, file size) and r
     "trim_seconds": 8.0,
     "add_fade_in": true,
     "add_fade_out": true,
-    "speed": 1.0
+    "speed": 1.0,
+    "style": "homevideo"
 }
 ```
 
 These decisions are validated with Pydantic and passed to ffmpeg for execution. Ollama never touches the video files directly.
+
+---
+
+## Styles
+
+Choose from these editing styles:
+
+| Style | Characteristics |
+|-------|-----------------|
+| homevideo | No fades, standard encoding, fast preset |
+| youtube | Half-second fades, audio normalization, veryfast preset |
+| cinematic | 2-second fades, high quality (crf 18), slow preset |
 
 ---
 
@@ -140,9 +156,15 @@ These decisions are validated with Pydantic and passed to ffmpeg for execution. 
 
 ---
 
+## Styles Configuration
+
+See `ffmpeg_runner.py:STYLE_TEMPLATES` for available styles and their encoding parameters.
+
+---
+
 ## Roadmap
 
-See [NOTES.md](./NOTES.md) for full details.
+See [CLAUDE.md](./CLAUDE.md) for development guidelines and [NOTES.md](./NOTES.md) for full details.
 
 - [ ] Nginx + HTTPS in production
 - [ ] CI/CD with GitHub Actions
